@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Крипто Задание: Вариант 7</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1e1e2f;
+      color: #f0f0f0;
+      padding: 40px;
+    }
+    h1 {
+      color: #4fd1c5;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 10px 20px 0;
+      background-color: #4fd1c5;
+      border: none;
+      border-radius: 8px;
+      color: #1e1e2f;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #38b2ac;
+    }
+    pre {
+      background: #2d2d3a;
+      padding: 20px;
+      border-radius: 10px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Криптография: фамилия "Гулевич"</h1>
+  <button onclick="generateRandomNumbers()">Задание 2: Случайные числа</button>
+  <button onclick="runVariant7()">Задание 3: AES-GCM + SHA384</button>
+  <button onclick="runKeyWrapping()">Задание 4: AES-KW Упаковка/Распаковка</button>
+  <button onclick="runECDSA()">Задание 5: ECDSA Подпись/Проверка</button>
+
+  <pre id="output"></pre>
+
+  <script>
+    const output = document.getElementById('output');
+    const surname = "Гулевич";
+    let generatedKey = null;
+
+    // Задание 2: Генерация случайных чисел
+    function generateRandomNumbers() {
+      output.textContent = "🔢 Задание 2: Генерация случайных чисел\n\n";
+      const randomValues = crypto.getRandomValues(new Uint8Array(16));
+      
+      output.textContent += `${randomValues}`;
+    }
+
+    // Задание 3: AES-GCM + SHA384
+    async function runVariant7() {
+      output.textContent = "🔐 Задание 3: AES-GCM + SHA-384\n\n";
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+
+      generatedKey = await crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        generatedKey,
+        enc.encode(surname)
+      );
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        generatedKey,
+        ciphertext
+      );
+
+      const hashBuffer = await crypto.subtle.digest("SHA-384", enc.encode(surname));
+      const hashHex = [...new Uint8Array(hashBuffer)]
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      output.textContent += `Исходная фамилия: ${surname}\n`;
+      output.textContent += `Случайный IV (hex): ${Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('')}\n`;
+      output.textContent += `Зашифровано (Base64): ${btoa(String.fromCharCode(...new Uint8Array(ciphertext)))}\n`;
+      output.textContent += `Расшифровано: ${dec.decode(decrypted)}\n`;
+      output.textContent += `SHA-384 хеш: ${hashHex}\n`;
+    }
+
+    // Задание 4: Упаковка и распаковка ключа AES-KW
+    async function runKeyWrapping() {
+      output.textContent = "🔐 Задание 4: AES-KW Упаковка и распаковка ключа\n\n";
+      
+      if (!generatedKey) {
+        output.textContent += "Сначала выполните Задание 3 для генерации ключа!\n";
+        return;
+      }
+
+      const wrappingKey = await crypto.subtle.generateKey(
+        { name: "AES-KW", length: 256 },
+        true,
+        ["wrapKey", "unwrapKey"]
+      );
+
+      const exportedKey = await crypto.subtle.exportKey("raw", generatedKey);
+      const wrappedKey = await crypto.subtle.wrapKey(
+        "raw",
+        generatedKey,
+        wrappingKey,
+        "AES-KW"
+      );
+
+      const unwrappedKey = await crypto.subtle.unwrapKey(
+        "raw",
+        wrappedKey,
+        wrappingKey,
+        "AES-KW",
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      output.textContent += `Экспортированный ключ (hex): ${Array.from(new Uint8Array(exportedKey)).map(b => b.toString(16).padStart(2, '0')).join('')}\n`;
+      output.textContent += `Упакованный ключ (Base64): ${btoa(String.fromCharCode(...new Uint8Array(wrappedKey)))}\n`;
+      output.textContent += `Ключ успешно распакован: ${unwrappedKey.algorithm.name === "AES-GCM" ? "Да" : "Нет"}\n`;
+    }
+
+    // Задание 5: ECDSA подпись и проверка
+    async function runECDSA() {
+      output.textContent = "🔐 Задание 5: ECDSA Подпись и проверка\n\n";
+      const enc = new TextEncoder();
+
+      const keyPair = await crypto.subtle.generateKey(
+        {
+          name: "ECDSA",
+          namedCurve: "P-256"
+        },
+        true,
+        ["sign", "verify"]
+      );
+
+      const signature = await crypto.subtle.sign(
+        {
+          name: "ECDSA",
+          hash: "SHA-256",
+        },
+        keyPair.privateKey,
+        enc.encode(surname)
+      );
+
+      const isValid = await crypto.subtle.verify(
+        {
+          name: "ECDSA",
+          hash: "SHA-256",
+        },
+        keyPair.publicKey,
+        signature,
+        enc.encode(surname)
+      );
+
+      output.textContent += `Сообщение: ${surname}\n`;
+      output.textContent += `Подпись (Base64): ${btoa(String.fromCharCode(...new Uint8Array(signature)))}\n`;
+      output.textContent += `Проверка подписи: ${isValid ? "Успешно" : "Неудача"}\n`;
+    }
+  </script>
+</body>
+</html>
